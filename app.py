@@ -18,8 +18,10 @@ st.set_page_config(page_title="DoChat", page_icon="📖", layout="centered")
 # "spine" rule under the header) — everything else stays quiet.
 # ---------------------------------------------------------------------------
 st.markdown("""
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;600&display=swap');
 
 :root {
     --bg-deep: #0F1420;
@@ -119,7 +121,18 @@ html, body, [class*="css"] {
 # APP LOGIC (unchanged behavior — just wired up to the new visuals)
 # ---------------------------------------------------------------------------
 
-llm = ChatGoogleGenerativeAI(model="gemini-3.6-flash")
+@st.cache_resource
+def get_llm():
+    return ChatGoogleGenerativeAI(model="gemini-3.6-flash")
+
+llm = get_llm()
+
+@st.cache_resource
+def get_embeddings():
+    return GoogleGenerativeAIEmbeddings(
+        model="gemini-embedding-2-preview",
+        google_api_key=os.getenv("GOOGLE_API_KEY")
+    )
 
 if "vector_db" not in st.session_state:
     st.session_state.vector_db = None
@@ -154,10 +167,7 @@ def document_process(path):
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         docs = splitter.split_documents(docs)
 
-        embeddings = GoogleGenerativeAIEmbeddings(
-            model="gemini-embedding-2-preview",
-            google_api_key=os.getenv("GOOGLE_API_KEY")
-        )
+        embeddings = get_embeddings()
         vector_db = InMemoryVectorStore.from_documents(documents=docs, embedding=embeddings)
 
         st.session_state.vector_db = vector_db
