@@ -1,0 +1,21 @@
+# Environment variables / secrets — NEVER commit this
+.env
+
+# Virtual environment
+env/
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Uploaded documents (temporary, user-specific)
+uploaded_document.pdf
+tissue.pdf
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
