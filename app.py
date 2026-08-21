@@ -17,6 +17,12 @@ st.set_page_config(page_title="DoChat", page_icon="📖", layout="centered")
 # nameplate over clean sans body text. One signature flourish (the gold
 # "spine" rule under the header) — everything else stays quiet.
 # ---------------------------------------------------------------------------
+
+st.markdown("""
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+""", unsafe_allow_html=True)
+
 st.markdown("""
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
