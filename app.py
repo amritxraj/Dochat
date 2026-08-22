@@ -13,131 +13,8 @@ from time import sleep
 st.set_page_config(page_title="DoChat", page_icon="📖", layout="centered")
 
 # ---------------------------------------------------------------------------
-# STYLING — "library at dusk": ink-blue depths, brass/gold accents, a serif
-# nameplate over clean sans body text. One signature flourish (the gold
-# "spine" rule under the header) — everything else stays quiet.
+# SESSION STATE INITIALIZATION — must happen before anything reads these
 # ---------------------------------------------------------------------------
-
-st.markdown("""
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;600&display=swap');
-
-:root {
-    --bg-deep: #0F1420;
-    --bg-panel: #171D2E;
-    --bg-panel-light: #1E2740;
-    --accent-gold: #C9A876;
-    --accent-slate: #6B8CAE;
-    --text-primary: #EDE8DC;
-    --text-muted: #8B93A8;
-}
-
-html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif;
-}
-
-.stApp {
-    background: linear-gradient(180deg, #0B0F18 0%, var(--bg-deep) 100%);
-    color: var(--text-primary);
-}
-
-.dochat-header {
-    text-align: center;
-    padding: 2.2rem 0 0.6rem 0;
-}
-.dochat-header h1 {
-    font-family: 'Fraunces', serif;
-    font-weight: 600;
-    font-size: 2.4rem;
-    letter-spacing: 0.01em;
-    color: var(--text-primary);
-    margin-bottom: 0.3rem;
-}
-.dochat-header p {
-    font-family: 'Inter', sans-serif;
-    color: var(--text-muted);
-    font-size: 0.95rem;
-    margin-top: 0;
-}
-
-.dochat-spine {
-    width: 120px;
-    height: 3px;
-    margin: 0.9rem auto 2.2rem auto;
-    background: linear-gradient(90deg, transparent, var(--accent-gold), transparent);
-    border-radius: 2px;
-}
-
-[data-testid="stFileUploader"] {
-    background: var(--bg-panel);
-    border: 1px dashed rgba(201, 168, 118, 0.35);
-    border-radius: 14px;
-    padding: 1.4rem;
-}
-[data-testid="stFileUploader"] section {
-    background: transparent;
-}
-
-[data-testid="stChatMessage"] {
-    background: var(--bg-panel);
-    border-radius: 14px;
-    padding: 0.4rem 0.6rem;
-    margin-bottom: 0.6rem;
-    border: 1px solid rgba(255,255,255,0.04);
-}
-
-[data-testid="stChatInput"] {
-    border-radius: 14px;
-}
-[data-testid="stChatInput"]:focus-within {
-    box-shadow: 0 0 0 2px rgba(201, 168, 118, 0.45);
-    border-radius: 14px;
-}
-
-.stButton button {
-    background: var(--accent-gold);
-    color: #0F1420;
-    border: none;
-    border-radius: 10px;
-    font-weight: 600;
-}
-.stButton button:hover {
-    background: #D9BC8D;
-    color: #0F1420;
-}
-
-.stAlert {
-    border-radius: 10px;
-}
-
-.block-container {
-    padding-top: 1.2rem;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# ---------------------------------------------------------------------------
-# APP LOGIC (unchanged behavior — just wired up to the new visuals)
-# ---------------------------------------------------------------------------
-
-@st.cache_resource
-def get_llm():
-    return ChatGoogleGenerativeAI(model="gemini-3.6-flash")
-
-llm = get_llm()
-
-@st.cache_resource
-def get_embeddings():
-    return GoogleGenerativeAIEmbeddings(
-        model="gemini-embedding-2-preview",
-        google_api_key=os.getenv("GOOGLE_API_KEY")
-    )
-
 if "vector_db" not in st.session_state:
     st.session_state.vector_db = None
 
@@ -150,7 +27,32 @@ if "messages" not in st.session_state:
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
+if "document_name" not in st.session_state:
+    st.session_state.document_name = None
 
+
+# ---------------------------------------------------------------------------
+# CACHED RESOURCES — built once, reused across reruns for speed
+# ---------------------------------------------------------------------------
+@st.cache_resource
+def get_llm():
+    return ChatGoogleGenerativeAI(model="gemini-3.6-flash")
+
+
+@st.cache_resource
+def get_embeddings():
+    return GoogleGenerativeAIEmbeddings(
+        model="gemini-embedding-2-preview",
+        google_api_key=os.getenv("GOOGLE_API_KEY")
+    )
+
+
+llm = get_llm()
+
+
+# ---------------------------------------------------------------------------
+# HELPER FUNCTIONS (unchanged — RAG/LLM logic untouched)
+# ---------------------------------------------------------------------------
 def extract_text(content):
     """Gemini 3.x returns content as a list of structured blocks instead of
     a plain string. This pulls just the text back out."""
@@ -204,15 +106,15 @@ def build_prompt_with_history(context, current_query, history, max_turns=5):
 
 
 # ---------------------------------------------------------------------------
-# HEADER
+# INITIAL HEADER — only shown before a document is uploaded
 # ---------------------------------------------------------------------------
-st.markdown("""
-<div class="dochat-header">
-    <h1>📖 DoChat</h1>
-    <p>Upload a document. Ask it anything.</p>
-</div>
-<div class="dochat-spine"></div>
-""", unsafe_allow_html=True)
+if not st.session_state.document_uploaded:
+    st.markdown("""
+    <div style="text-align:center; padding: 1.5rem 0 0.5rem 0;">
+        <h1 style="color:#C9A876; margin-bottom:0.2rem;">📖 DoChat</h1>
+        <p style="color:#8B93A8; margin-top:0;">Upload a document. Ask it anything.</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
@@ -225,6 +127,8 @@ if not st.session_state.document_uploaded:
         with open(file_path, "wb") as f:
             f.write(file.getvalue())
 
+        st.session_state.document_name = file.name  # store for display later
+
         with st.spinner("Reading your document..."):
             success = document_process(file_path)
 
@@ -235,7 +139,41 @@ if not st.session_state.document_uploaded:
 
 
 # ---------------------------------------------------------------------------
-# CHAT
+# DOCUMENT INFO SECTION — replaces the old header once a document is ready
+# ---------------------------------------------------------------------------
+if st.session_state.document_uploaded and st.session_state.vector_db:
+    st.markdown(f"""
+    <div style="
+        background: #171D2E;
+        border: 1px solid rgba(201, 168, 118, 0.35);
+        border-radius: 16px;
+        padding: 1.4rem 1.6rem;
+        margin: 1rem 0 1.6rem 0;
+    ">
+        <p style="color:#C9A876; font-weight:700; font-size:1.1rem; margin-bottom:0.4rem;">
+            📄 Document uploaded
+        </p>
+        <p style="
+            color:#EDE8DC;
+            font-family: monospace;
+            font-size:1.05rem;
+            background: rgba(255,255,255,0.05);
+            display:inline-block;
+            padding: 0.25rem 0.7rem;
+            border-radius: 8px;
+            margin-top:0;
+            margin-bottom:0.7rem;
+        ">
+            {st.session_state.document_name}
+        </p>
+        <p style="color:#8B93A8; margin-top:0; margin-bottom:0;">
+            Your document has been uploaded successfully. You can now ask questions about it.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
+# CHAT (unchanged behavior — same message loop, same input handling)
 # ---------------------------------------------------------------------------
 if st.session_state.document_uploaded and st.session_state.vector_db:
 
@@ -243,7 +181,7 @@ if st.session_state.document_uploaded and st.session_state.vector_db:
         avatar = "🧑" if msg["role"] == "user" else "📖"
         st.chat_message(msg["role"], avatar=avatar).markdown(msg["content"])
 
-    query = st.chat_input("Ask anything about your document...")
+    query = st.chat_input("Ask a question about your document...")
 
     if query:
         st.session_state.messages.append({"role": "user", "content": query})
