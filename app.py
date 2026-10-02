@@ -187,7 +187,7 @@ if st.session_state.document_uploaded and st.session_state.vector_db:
         st.session_state.messages.append({"role": "user", "content": query})
         st.chat_message("user", avatar="🧑").markdown(query)
 
-        documents = st.session_state.vector_db.similarity_search(query, k=2)
+        documents = st.session_state.vector_db.similarity_search(query, k=8)
         context = ""
         for doc in documents:
             context += doc.page_content + "\n\n"
@@ -221,3 +221,4 @@ if st.session_state.document_uploaded and st.session_state.vector_db:
             st.markdown(answer)
 
         st.session_state.messages.append({"role": "assistant", "content": answer})
+        
